@@ -17,16 +17,7 @@ export function registerTreeViewer(pi: any) {
       const treeMd = await fs.readFile(join(dir, "tree.md"), "utf8");
       const findingsMd = await fs.readFile(join(dir, "findings.md"), "utf8");
       const body = treeMd + "\n\n---\n\n" + findingsMd;
-      if (typeof ctx.ui.custom === "function") {
-        await ctx.ui.custom({
-          title: `Engagement: ${eng}`,
-          body,
-          fullscreen: true,
-          keys: { q: "close", Esc: "close" },
-        });
-      } else {
-        ctx.ui.notify(body.slice(0, 4000), "info");
-      }
+      ctx.ui.notify(body.slice(0, 4000), "info");
     },
   });
 }
