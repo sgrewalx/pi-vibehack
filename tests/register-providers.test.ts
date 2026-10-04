@@ -21,7 +21,8 @@ describe("registerProvidersFromConfig", () => {
     const fakePi = { registerProvider: vi.fn() };
     registerProvidersFromConfig(fakePi, cfg);
     expect(fakePi.registerProvider).toHaveBeenCalledOnce();
-    const arg = fakePi.registerProvider.mock.calls[0][0];
+    const [name, arg] = fakePi.registerProvider.mock.calls[0];
+    expect(name).toBe("local-lmstudio");
     expect(arg.baseUrl).toBe("http://localhost:1234/v1");
     expect(arg.apiKey).toBe("sk-local");
   });
@@ -41,7 +42,7 @@ describe("registerProvidersFromConfig", () => {
     };
     vi.stubEnv("GOOD_ENV", "ok");
     const fakePi = {
-      registerProvider: vi.fn((arg: any) => { if (!arg.apiKey) throw new Error("bad"); }),
+      registerProvider: vi.fn((_name: string, arg: any) => { if (!arg.apiKey) throw new Error("bad"); }),
     };
     registerProvidersFromConfig(fakePi, cfg);
     expect(fakePi.registerProvider).toHaveBeenCalledTimes(2);
