@@ -168,14 +168,28 @@ export default function vibehack(pi: any) {
         return;
       }
 
-      const { activeEngagementId, setActiveEngagement, engagementDir, newEngagementId, slugify } =
+      const { activeEngagementId, setActiveEngagement, engagementDir, newEngagementId } =
         await import("./lib/engagement.ts");
-      const { appendEvent, nowIso } = await import("./lib/events.ts");
+      const { appendEvent, readEvents, nowIso } = await import("./lib/events.ts");
       const { promises: fs } = await import("node:fs");
 
       const existing = await activeEngagementId();
 
-      if (existing && existing.endsWith(`-${slugify(target)}`)) {
+      let existingTarget: string | undefined;
+      if (existing) {
+        try {
+          const events = await readEvents(engagementDir(existing));
+          const start = events.find(
+            (event: any) => event.event === "engagement_start",
+          );
+          existingTarget =
+            typeof (start as any)?.metadata?.target === "string"
+              ? (start as any).metadata.target
+              : undefined;
+        } catch {}
+      }
+
+      if (existing && existingTarget === target) {
         ctx.ui.notify(`engagement already active: ${existing}`, "info");
       } else {
         const engId = newEngagementId(target);

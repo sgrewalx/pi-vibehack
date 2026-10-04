@@ -46,6 +46,53 @@ describe("vibehack engagement session naming", () => {
   });
 
 
+
+  it("compares stored target metadata instead of engagement-id suffixes", async () => {
+    const { setActiveEngagement, engagementDir, activeEngagementId } =
+      await import("../extensions/pi-vibehack/lib/engagement.ts");
+    const { appendEvent, nowIso, readEvents } =
+      await import("../extensions/pi-vibehack/lib/events.ts");
+
+    const existing = "2026-10-04-https-example-com";
+    await fs.mkdir(engagementDir(existing), { recursive: true });
+    await setActiveEngagement(existing);
+    await appendEvent(engagementDir(existing), {
+      ts: nowIso(),
+      engagement_id: existing,
+      event: "engagement_start",
+      metadata: { target: "https://example.com" },
+    } as any);
+
+    const setSessionName = vi.fn();
+    let captured: any = null;
+
+    const fakePi: any = {
+      events: { emit: vi.fn(), on: vi.fn() },
+      on: vi.fn(),
+      registerTool: vi.fn(),
+      registerCommand: (name: string, opts: any) => {
+        if (name === "vibehack") captured = opts.handler;
+      },
+      registerMessageRenderer: vi.fn(),
+      setSessionName,
+      setActiveTools: vi.fn(),
+    };
+
+    vibehack(fakePi);
+
+    const ctx: any = { ui: { notify: vi.fn() } };
+    await captured("example.com", ctx);
+
+    expect(setSessionName).toHaveBeenCalledWith("vibehack: example.com");
+
+    const active = await activeEngagementId();
+    expect(active).not.toBe(existing);
+
+    const events = await readEvents(engagementDir(active!));
+    const start = events.find((event: any) => event.event === "engagement_start");
+    expect((start as any)?.metadata?.target).toBe("example.com");
+  });
+
   it("does not mistake a --loop value for the engagement target", async () => {
     const setSessionName = vi.fn();
     let captured: any = null;
