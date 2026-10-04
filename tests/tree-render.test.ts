@@ -23,7 +23,7 @@ const ev = (over: Partial<VibehackEvent>): VibehackEvent => ({
   rationale: "",
   metadata: {},
   ...over,
-});
+} as VibehackEvent);
 
 describe("foldNodes", () => {
   it("folds add events into a node map", () => {

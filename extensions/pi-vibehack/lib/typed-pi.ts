@@ -1,6 +1,6 @@
 // Re-exports of pi-mono extension API types so call sites in pi-vibehack
 // don't litter deep imports throughout. Import from this module instead of
-// `@mariozechner/pi-coding-agent` directly — that way if pi-mono renames
+// `@earendil-works/pi-coding-agent` directly — that way if pi-mono renames
 // or restructures, we only update one file.
 //
 // Phase 1 of the v1.2 rewire plan (extensions/pi-vibehack/lib/typed-pi.ts).
@@ -36,4 +36,4 @@ export type {
   ToolDefinition,
   RegisteredTool,
   ToolExecutionMode,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";

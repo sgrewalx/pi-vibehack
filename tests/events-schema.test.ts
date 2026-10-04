@@ -91,6 +91,8 @@ describe("event append/read", () => {
     await appendEvent(dir, { ...ev, node_id: "n_3b" } as any);
     const all = await readEvents(dir);
     expect(all.length).toBe(2);
+    expect(all[1].event).toBe("node_add");
+    if (all[1].event !== "node_add") throw new Error("expected node_add");
     expect(all[1].node_id).toBe("n_3b");
     await fs.rm(dir, { recursive: true });
   });

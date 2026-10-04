@@ -6,7 +6,9 @@ import { readConfig, writeConfig, defaultConfig, migrateConfig } from "../bin/li
 
 const TMP = path.join(os.tmpdir(), `vibehack-config-${process.pid}`);
 
-beforeEach(() => fs.mkdirSync(TMP, { recursive: true }));
+beforeEach(() => {
+  fs.mkdirSync(TMP, { recursive: true });
+});
 afterEach(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
 describe("config.js", () => {

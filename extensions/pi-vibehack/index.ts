@@ -149,10 +149,16 @@ export default function vibehack(pi: any) {
       let total = 0;
       const byTool: Record<string, number> = {};
       for (const e of events) {
-        total += e.cost_usd ?? 0;
+        const eventCost =
+          "cost_usd" in e && typeof e.cost_usd === "number"
+            ? e.cost_usd
+            : 0;
+
+        total += eventCost;
+
         if (e.event === "tool_result") {
           const t = (e as any).metadata?.tool_name ?? "unknown";
-          byTool[t] = (byTool[t] ?? 0) + (e.cost_usd ?? 0);
+          byTool[t] = (byTool[t] ?? 0) + eventCost;
         }
       }
       const lines = [`Engagement ${eng}: $${total.toFixed(4)}`];

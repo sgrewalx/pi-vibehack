@@ -11,6 +11,9 @@ export const PROFILE_TEMPLATES = {
 // Backward-compat alias.
 export const defaultModelMap = PROFILE_TEMPLATES;
 
+/**
+ * @param {{ profile?: string, planner?: string, operator?: string, reporter?: string }} [options]
+ */
 export function resolveProfile({ profile = "hybrid", planner, operator, reporter } = {}) {
   const base = PROFILE_TEMPLATES[profile];
   if (!base) throw new Error(`unknown profile: ${profile}`);

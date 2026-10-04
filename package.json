@@ -64,9 +64,9 @@
     "pack:dry": "npm pack --dry-run"
   },
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "*",
     "pi-prompt-template-model": "^0.12.3",
-    "@sinclair/typebox": "*"
+    "@sinclair/typebox": "*",
+    "@earendil-works/pi-coding-agent": "*"
   },
   "peerDependenciesMeta": {
     "@zenobius/pi-dcp": {
@@ -81,7 +81,8 @@
     "@types/node": "^20.0.0",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0",
-    "@sinclair/typebox": "^0.32.0"
+    "@sinclair/typebox": "^0.32.0",
+    "@earendil-works/pi-coding-agent": "^1.0.2"
   },
   "dependencies": {
     "yaml": "^2.8.4"

@@ -41,6 +41,7 @@ describe("vibehack_expand", () => {
     const events = await readEvents(engagementDir("e1"));
     expect(events.length).toBe(1);
     expect(events[0].event).toBe("node_add");
+    if (events[0].event !== "node_add") throw new Error("expected node_add");
     expect(events[0].kind).toBe("root");
   });
 
@@ -62,6 +63,7 @@ describe("vibehack_prune", () => {
     await pruneTool.execute("c", { node_id: "n_1a", reason: "out of scope" } as any, undefined, undefined, fakeCtx);
     const events = await readEvents(engagementDir("e1"));
     expect(events[0].event).toBe("node_prune");
+    if (events[0].event !== "node_prune") throw new Error("expected node_prune");
     expect(events[0].rationale).toBe("out of scope");
   });
 });
@@ -71,6 +73,7 @@ describe("vibehack_confirm", () => {
     await confirmTool.execute("c", { node_id: "n_2a", poc_summary: "RCE confirmed", evidence_refs: ["evidence/x.txt"] } as any, undefined, undefined, fakeCtx);
     const events = await readEvents(engagementDir("e1"));
     expect(events[0].event).toBe("confirm");
+    if (events[0].event !== "confirm") throw new Error("expected confirm");
     expect(events[0].rationale).toBe("RCE confirmed");
     expect((events[0] as any).metadata.evidence_refs).toEqual(["evidence/x.txt"]);
   });
@@ -81,6 +84,7 @@ describe("vibehack_evidence", () => {
     await evidenceTool.execute("c", { node_id: "n_1a", kind: "http_replay", ref: "evidence/r.json", summary: "200 OK" } as any, undefined, undefined, fakeCtx);
     const events = await readEvents(engagementDir("e1"));
     expect(events[0].event).toBe("evidence_add");
+    if (events[0].event !== "evidence_add") throw new Error("expected evidence_add");
     expect(events[0].evidence?.length).toBe(1);
     expect(events[0].evidence?.[0].kind).toBe("http_replay");
   });
@@ -91,6 +95,7 @@ describe("vibehack_dead_end", () => {
     await deadEndTool.execute("c", { node_id: "n_1a", reason: "stack-only, no userland reach" } as any, undefined, undefined, fakeCtx);
     const events = await readEvents(engagementDir("e1"));
     expect(events[0].event).toBe("node_update");
+    if (events[0].event !== "node_update") throw new Error("expected node_update");
     expect(events[0].status).toBe("dead");
     expect(events[0].rationale).toBe("stack-only, no userland reach");
   });

@@ -91,19 +91,19 @@ export function validateVerifierResult(
 
 export function registerToolResultHook(pi: ExtensionAPI) {
   pi.on("tool_result", async (typedEvent: ToolResultEvent, _ctx: ExtensionContext) => {
-    // Local untyped alias: this hook still reads legacy fields (`output`,
-    // `cost_usd`, `usage`, `context`, `structuredOutput`) that older pi
-    // versions exposed. The typed shape only guarantees `content`. Cast once
-    // here so the rest of the body compiles; full migration to typed
-    // {content, details, isError} is deferred (Phase 3+).
-    const event = typedEvent as ToolResultEvent & Record<string, any>;
+    const event = typedEvent;
+    const textOutput = event.content
+      .filter((c: any) => c?.type === "text")
+      .map((c: any) => c.text ?? "")
+      .join("\n");
+    const structured: any = event.structuredContent ?? event.details;
     try {
     const eng = await activeEngagementId();
     if (!eng) return;
     const dir = engagementDir(eng);
 
     // Cost tally + result mirror — best-effort.
-    const cost = event.cost_usd ?? event.usage?.cost_usd ?? 0;
+    const cost = event.usage?.cost?.total ?? 0;
     try {
       await appendEvent(dir, {
         ts: nowIso(),
@@ -113,10 +113,7 @@ export function registerToolResultHook(pi: ExtensionAPI) {
         metadata: {
           tool_name: event.toolName,
           call_id: event.toolCallId,
-          output_summary:
-            typeof event.output === "string"
-              ? event.output.slice(0, 500)
-              : JSON.stringify(event.output).slice(0, 500),
+          output_summary: textOutput.slice(0, 500),
         },
       } as any);
     } catch {}
@@ -129,9 +126,9 @@ export function registerToolResultHook(pi: ExtensionAPI) {
     }
 
     // Negative-space synthesis on bash outputs.
-    if (event.toolName === "bash" && typeof event.output === "string") {
-      if (looksLikeHttpResponse(event.output)) {
-        const headers = parseHttpHeaders(event.output);
+    if (event.toolName === "bash" && textOutput) {
+      if (looksLikeHttpResponse(textOutput)) {
+        const headers = parseHttpHeaders(textOutput);
         const missing = detectMissingHeaders(headers);
         for (const m of missing) {
           try {
@@ -152,9 +149,9 @@ export function registerToolResultHook(pi: ExtensionAPI) {
         }
       }
       // Nmap parsing: lines like "22/tcp open ssh"
-      if (/^\d+\/tcp\s+\w+/m.test(event.output)) {
+      if (/^\d+\/tcp\s+\w+/m.test(textOutput)) {
         const open = new Set<number>();
-        for (const line of event.output.split(/\r?\n/)) {
+        for (const line of textOutput.split(/\r?\n/)) {
           const m = /^(\d+)\/tcp\s+open/.exec(line);
           if (m) open.add(parseInt(m[1], 10));
         }
@@ -183,7 +180,7 @@ export function registerToolResultHook(pi: ExtensionAPI) {
 
     // Mirror Operator-returned auth_state_changes into pi-super-curl config (if present)
     try {
-      const out = (event as any).structuredOutput;
+      const out = structured;
       if (out?.auth_state_changes && out.auth_state_changes.profile_id) {
         const { mirrorAuthProfile } = await import("../lib/scurl-bridge.ts");
         await mirrorAuthProfile(out.auth_state_changes);
@@ -192,9 +189,8 @@ export function registerToolResultHook(pi: ExtensionAPI) {
 
     // Wire #1: per-leaf Reporter auto-spawn on confirm
     try {
-      if (event.toolName === "vibehack_confirm" && event.output) {
-        const out: any = typeof event.output === "string" ? null : event.output;
-        const node_id = out?.details?.node_id ?? out?.node_id;
+      if (event.toolName === "vibehack_confirm") {
+        const node_id = (event.details as any)?.node_id ?? structured?.node_id;
         if (node_id) {
           const { spawnReporter } = await import("../lib/reporter-spawn.ts");
           const { promises: fs2 } = await import("node:fs");
@@ -210,7 +206,7 @@ export function registerToolResultHook(pi: ExtensionAPI) {
 
     // Browser-verifier specialist: validate screenshot before emitting verification_pass.
     try {
-      const struct = (event as any).structuredOutput ?? (event as any).output;
+      const struct = structured;
       const looksLikeVerifier =
         struct &&
         typeof struct === "object" &&
@@ -221,8 +217,8 @@ export function registerToolResultHook(pi: ExtensionAPI) {
         /browser-verifier/i.test(toolName) ||
         (struct && struct.__verifier === "browser-verifier");
       if (looksLikeVerifier && isVerifierTool) {
-        const node_id = struct.node_id ?? struct.context?.node_id ?? event.context?.node_id;
-        const kind = struct.kind ?? struct.context?.kind ?? event.context?.kind;
+        const node_id = struct.node_id ?? struct.context?.node_id;
+        const kind = struct.kind ?? struct.context?.kind;
         if (node_id && kind) {
           const out = validateVerifierResult(struct, {
             node_id,
@@ -236,7 +232,7 @@ export function registerToolResultHook(pi: ExtensionAPI) {
 
     // Wire #2: auto-handoff for the next subprocess from any subagent-style tool result
     try {
-      const struct = (event as any).structuredOutput ?? (event as any).output?.structured;
+      const struct = structured?.structured ?? structured;
       const looksLikeOperator = struct && typeof struct === "object" && "outcome" in struct && "handoff_summary" in struct;
       if (looksLikeOperator) {
         const { buildHandoff } = await import("../lib/handoff.ts");

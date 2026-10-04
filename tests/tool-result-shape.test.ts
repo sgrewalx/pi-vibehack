@@ -53,7 +53,7 @@ describe("tool-result helpers", () => {
   it("wrapToolResult catches throws and returns isError", async () => {
     const tool = { name: "boom", execute: async () => { throw new Error("kaboom"); } };
     const w = wrapToolResult(tool);
-    const r: any = await w.execute("c", {});
+    const r: any = await w.execute();
     expect(r.isError).toBe(true);
     expect(r.content[0].text).toMatch(/tool boom threw: kaboom/);
   });
