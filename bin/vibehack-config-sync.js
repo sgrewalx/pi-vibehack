@@ -19,19 +19,6 @@ const RUNTIME_PROMPTS_DIR = path.join(VIBEHACK_DIR, "prompts");
 const CONFIG_PATH = path.join(VIBEHACK_DIR, "config.yaml");
 const SETTINGS_PATH = path.join(os.homedir(), ".pi", "agent", "settings.json");
 
-if (process.argv.includes("--help") || process.argv.includes("-h")) {
-  console.log("Usage: vibehack-config-sync [--profile <hybrid|local|frontier>]");
-  console.log("");
-  console.log(`  Reads ${CONFIG_PATH} (if present), copies package prompts to`);
-  console.log(`  ${RUNTIME_PROMPTS_DIR}, and rewrites model frontmatter there.`);
-  console.log("  The package source prompts remain unchanged.");
-  console.log("  Falls back to the named profile when config.yaml is absent.");
-  process.exit(0);
-}
-
-const profileIdx = process.argv.indexOf("--profile");
-const profile = profileIdx >= 0 ? process.argv[profileIdx + 1] : "hybrid";
-
 export async function syncPrompts({
   profile = "hybrid",
   sourcePromptsDir = SOURCE_PROMPTS_DIR,
@@ -58,6 +45,19 @@ const isMain =
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    console.log("Usage: vibehack-config-sync [--profile <hybrid|local|frontier>]");
+    console.log("");
+    console.log(`  Reads ${CONFIG_PATH} (if present), copies package prompts to`);
+    console.log(`  ${RUNTIME_PROMPTS_DIR}, and rewrites model frontmatter there.`);
+    console.log("  The package source prompts remain unchanged.");
+    console.log("  Falls back to the named profile when config.yaml is absent.");
+    process.exit(0);
+  }
+
+  const profileIdx = process.argv.indexOf("--profile");
+  const profile = profileIdx >= 0 ? process.argv[profileIdx + 1] : "hybrid";
+
   syncPrompts({ profile })
     .then(({ runtimePromptsDir, configPath }) => {
       console.log(

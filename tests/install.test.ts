@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { addPackage, addPromptPath, removePackage, readSettings } from "../bin/lib/settings.js";
 import { ensureDataDir, vibehackDir, writeProfile, readProfile } from "../bin/lib/data-dir.js";
+import { localPackageSpec, registerCurrentPackage } from "../bin/install.js";
 
 let tmp: string;
 beforeEach(async () => {
@@ -52,6 +53,42 @@ describe("settings.json patcher", () => {
     const s = await readSettings(path);
     expect(s.theme).toBe("dark");
     expect(s.prompts).toEqual(["/existing/prompts", "/runtime/prompts"]);
+  });
+
+  it("registers a local checkout path without leaving an npm package duplicate", async () => {
+    const settingsPath = join(tmp, "agent", "settings.json");
+    const checkout = join(tmp, "checkout");
+
+    await fs.mkdir(checkout, { recursive: true });
+    await fs.mkdir(join(tmp, "agent"), { recursive: true });
+
+    await fs.writeFile(
+      settingsPath,
+      JSON.stringify({
+        packages: [
+          "npm:@m4xx101/vibeshack@1.4.3",
+          "npm:other-package@1.0.0",
+        ],
+      }),
+    );
+
+    const source = await registerCurrentPackage(settingsPath, {
+      isNpmPackage: false,
+      packageRoot: checkout,
+    });
+
+    const settings = await readSettings(settingsPath);
+    const expectedPath = localPackageSpec(settingsPath, checkout);
+
+    expect(source).toBe("local");
+    expect(settings.packages).toContain(expectedPath);
+    expect(settings.packages).toContain("npm:other-package@1.0.0");
+    expect(
+      settings.packages.some((p: string) =>
+        p.startsWith("npm:@m4xx101/vibeshack"),
+      ),
+    ).toBe(false);
+    expect(settings.packages.filter((p: string) => p === expectedPath)).toHaveLength(1);
   });
 
   it("removePackage removes the matching entry", async () => {

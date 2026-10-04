@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 import { homedir } from "node:os";
-import { join } from "node:path";
-import { readFileSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import { addPackage, removePackage } from "./lib/settings.js";
+import { addPackage, addPackagePath, removePackage } from "./lib/settings.js";
 import { resolveProfile } from "./lib/profile.js";
 import { vibehackDir, ensureDataDir, writeProfile } from "./lib/data-dir.js";
 import { defaultConfig, writeConfig } from "./lib/config.js";
+import { syncPrompts } from "./vibehack-config-sync.js";
 
 async function verifyPiInstalled() {
   return await new Promise((resolve) => {
@@ -19,6 +21,44 @@ async function verifyPiInstalled() {
 const PKG = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 );
+
+const INSTALL_SCRIPT = fileURLToPath(import.meta.url);
+const PACKAGE_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const IS_NPM_PACKAGE = PACKAGE_ROOT.includes(`${sep}node_modules${sep}`);
+const IS_GIT_CHECKOUT = existsSync(join(PACKAGE_ROOT, ".git"));
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function localPackageSpec(settingsPath, packageRoot = PACKAGE_ROOT) {
+  return relative(dirname(settingsPath), packageRoot) || ".";
+}
+
+export async function registerCurrentPackage(
+  settingsPath,
+  {
+    isNpmPackage = IS_NPM_PACKAGE,
+    packageRoot = PACKAGE_ROOT,
+  } = {},
+) {
+  const npmMatcher = new RegExp(`^npm:${escapeRegExp(PKG.name)}(?:@|$)`);
+
+  if (isNpmPackage) {
+    await addPackage(settingsPath, `npm:${PKG.name}@${PKG.version}`);
+    return "npm";
+  }
+
+  // Running from a source checkout/local path: never replace it with the
+  // upstream npm package. Remove a stale npm registration for this package,
+  // then register the current source tree as a path package.
+  await removePackage(settingsPath, npmMatcher);
+  await addPackagePath(
+    settingsPath,
+    localPackageSpec(settingsPath, packageRoot),
+  );
+  return "local";
+}
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -130,9 +170,9 @@ async function cmdInstall(args) {
   const dryRun = !!args["dry-run"];
   if (!dryRun && !(await verifyPiInstalled())) {
     console.error("✗ pi (pi-mono) is not on PATH.");
-    console.error("  Install: npm i -g @mariozechner/pi-coding-agent");
+    console.error("  Install: npm i -g @earendil-works/pi-coding-agent");
     console.error("  If install fails with a `bunx git-hooks` error, retry with:");
-    console.error("    npm i -g @mariozechner/pi-coding-agent --ignore-scripts");
+    console.error("    npm i -g @earendil-works/pi-coding-agent --ignore-scripts");
     console.error("  See docs/TROUBLESHOOTING.md for details (incl. WSL PATH-shadowing).");
     console.error("  Then re-run this installer.");
     process.exit(2);
@@ -146,22 +186,29 @@ async function cmdInstall(args) {
     reporter: args.reporter,
   });
 
-  // Write config.yaml (seed from profile templates, overlay explicit flags).
+  // Write config.yaml unless an update explicitly asked us to preserve an
+  // existing configuration. Updates must never silently reset model choices.
   const cfgOut = args["config-out"]
     ?? join(homedir(), ".pi", "agent", "vibehack", "config.yaml");
-  const cfg = defaultConfig(profile.profile);
-  cfg.models.planner = profile.planner;
-  cfg.models.operator = profile.operator;
-  cfg.models.reporter = profile.reporter;
-  writeConfig(cfgOut, cfg);
-  console.log(`✓ config written: ${cfgOut}`);
+  const preserveConfig = !!args["preserve-config"] && existsSync(cfgOut);
+
+  if (preserveConfig) {
+    console.log(`✓ config preserved: ${cfgOut}`);
+  } else {
+    const cfg = defaultConfig(profile.profile);
+    cfg.models.planner = profile.planner;
+    cfg.models.operator = profile.operator;
+    cfg.models.reporter = profile.reporter;
+    writeConfig(cfgOut, cfg);
+    console.log(`✓ config written: ${cfgOut}`);
+  }
 
   if (dryRun) {
     console.log(`(dry-run: skipping settings.json + npm package registration)`);
     return;
   }
 
-  await addPackage(settingsPath, `npm:${PKG.name}@${PKG.version}`);
+  const packageSource = await registerCurrentPackage(settingsPath);
   await addPackage(settingsPath, "npm:pi-prompt-template-model@^0.12.3");
 
   // @zenobius/pi-dcp's transitive @stacksjs/clarity has a broken postinstall
@@ -173,13 +220,21 @@ async function cmdInstall(args) {
 
   const dataDir = vibehackDir(args["data-dir"]);
   await ensureDataDir(dataDir);
-  await writeProfile(dataDir, profile);
 
-  const { rewritePromptsForProfile } = await import("./lib/rewrite-prompts.js");
-  await rewritePromptsForProfile(profile);
-  console.log(`✓ prompt frontmatter rewritten for profile=${profile.profile}`);
+  if (!preserveConfig) {
+    await writeProfile(dataDir, profile);
+  }
 
-  console.log(`✓ ${PKG.name}@${PKG.version} installed`);
+  await syncPrompts({
+    profile: profile.profile,
+    configPath: cfgOut,
+    settingsPath,
+  });
+  console.log(`✓ runtime prompts generated from config.yaml`);
+
+  console.log(
+    `✓ ${PKG.name}@${PKG.version} installed (${packageSource === "local" ? "local path" : "npm"})`,
+  );
   console.log(`✓ settings.json patched: ${settingsPath}`);
   console.log(`✓ data dir: ${dataDir}`);
   console.log(`✓ profile: ${profile.profile} (planner=${profile.planner} operator=${profile.operator} reporter=${profile.reporter})`);
@@ -194,14 +249,45 @@ async function cmdInstall(args) {
 }
 
 async function cmdUpdate(args) {
-  // Self-update: pull the latest @m4xx101/vibeshack from npm, then re-run
-  // install (idempotent). Preserves config.yaml, hand-edited prompt frontmatter,
-  // and engagement data; refreshes the package, settings.json package pins,
-  // soft-dep + Kali caches.
-  console.log(`→ pulling latest @m4xx101/vibeshack from npm...`);
   const { spawn } = await import("node:child_process");
+
+  if (IS_GIT_CHECKOUT) {
+    console.log(`→ updating local Git checkout: ${PACKAGE_ROOT}`);
+    const code = await new Promise((resolve) => {
+      const c = spawn("git", ["-C", PACKAGE_ROOT, "pull", "--ff-only"], {
+        stdio: "inherit",
+        shell: process.platform === "win32",
+      });
+      c.on("error", () => resolve(1));
+      c.on("close", (rc) => resolve(rc ?? 1));
+    });
+    if (code !== 0) {
+      console.error(`✗ git pull --ff-only failed (exit ${code}). Aborting update.`);
+      process.exit(code);
+    }
+
+    console.log(`✓ source updated; refreshing runtime configuration...\n`);
+    const re = spawn(
+      process.execPath,
+      [INSTALL_SCRIPT, "install", "--preserve-config", ...process.argv.slice(3)],
+      {
+        stdio: "inherit",
+        shell: false,
+      },
+    );
+    re.on("close", (rc) => process.exit(rc ?? 0));
+    return;
+  }
+
+  if (!IS_NPM_PACKAGE) {
+    console.error("✗ this is a local non-Git package; automatic update is unavailable.");
+    console.error(`  Update the source at ${PACKAGE_ROOT}, then re-run install.`);
+    process.exit(2);
+  }
+
+  console.log(`→ pulling latest ${PKG.name} from npm...`);
   const code = await new Promise((resolve) => {
-    const c = spawn("npm", ["install", "-g", "@m4xx101/vibeshack@latest"], {
+    const c = spawn("npm", ["install", "-g", `${PKG.name}@latest`], {
       stdio: "inherit",
       shell: process.platform === "win32",
     });
@@ -212,45 +298,83 @@ async function cmdUpdate(args) {
     console.error(`✗ npm install failed (exit ${code}). Aborting update.`);
     process.exit(code);
   }
-  console.log(`✓ package updated; re-running install (idempotent — preserves config + hand-edits)...\n`);
 
-  // Re-exec the freshly-installed binary so the install logic that runs is the
-  // NEW version's, not whatever this stale process loaded. spawn pi-vibehack
-  // (now points at the new package) with `install` and forward all flags.
-  const re = spawn("pi-vibehack", ["install", ...process.argv.slice(3)], {
-    stdio: "inherit",
-    shell: process.platform === "win32",
-  });
+  console.log(`✓ package updated; refreshing runtime configuration...\n`);
+
+  // Re-exec the newly-installed CLI while explicitly preserving config.yaml.
+  const re = spawn(
+    "pi-vibehack",
+    ["install", "--preserve-config", ...process.argv.slice(3)],
+    {
+      stdio: "inherit",
+      shell: process.platform === "win32",
+    },
+  );
   re.on("close", (rc) => process.exit(rc ?? 0));
 }
 
 async function cmdUninstall(args) {
   const settingsPath = resolveSettingsPath(args);
   const dataDir = vibehackDir(args["data-dir"]);
-  await removePackage(settingsPath, /^npm:@m4xx101\/pi-vibehack/);
+  const npmMatcher = new RegExp(`^npm:${escapeRegExp(PKG.name)}(?:@|$)`);
+
+  await removePackage(settingsPath, npmMatcher);
+
+  if (!IS_NPM_PACKAGE) {
+    const pathSpec = localPackageSpec(settingsPath);
+    await removePackage(
+      settingsPath,
+      new RegExp(`^${escapeRegExp(pathSpec)}$`),
+    );
+  }
+
   console.log(`✓ removed ${PKG.name} from ${settingsPath}`);
   console.log(`(engagement data preserved at ${dataDir})`);
 }
 
-const args = parseArgs(process.argv.slice(2));
-// --version / --help short-circuit BEFORE dispatch so they don't fall through
-// to the default "install" command. parseArgs puts --version into args.version,
-// not args._, so the previous `cmd === "--version"` branch was unreachable.
-if (args.version === true || args.help === true || args._[0] === "-v" || args._[0] === "--version" || args._[0] === "-h" || args._[0] === "--help") {
-  if (args.help === true || args._[0] === "-h" || args._[0] === "--help") {
-    console.log("Usage: pi-vibehack [install|update|uninstall] [--profile=hybrid|haiku|opus] [--with-dcp]\n       pi-vibehack --version");
-  } else {
-    console.log(PKG.version);
+const isMain =
+  process.argv[1] &&
+  resolve(process.argv[1]) === INSTALL_SCRIPT;
+
+if (isMain) {
+  const args = parseArgs(process.argv.slice(2));
+
+  // --version / --help short-circuit BEFORE dispatch so they don't fall through
+  // to the default "install" command.
+  if (
+    args.version === true ||
+    args.help === true ||
+    args._[0] === "-v" ||
+    args._[0] === "--version" ||
+    args._[0] === "-h" ||
+    args._[0] === "--help"
+  ) {
+    if (args.help === true || args._[0] === "-h" || args._[0] === "--help") {
+      console.log(
+        "Usage: pi-vibehack [install|update|uninstall] [--profile=hybrid|frontier|local]\n" +
+        "       pi-vibehack --version",
+      );
+    } else {
+      console.log(PKG.version);
+    }
+    process.exit(0);
   }
-  process.exit(0);
-}
-const cmd = args._[0] ?? "install";
-try {
-  if (cmd === "install") await cmdInstall(args);
-  else if (cmd === "update") await cmdUpdate(args);
-  else if (cmd === "uninstall") await cmdUninstall(args);
-  else { console.error(`unknown command: ${cmd}\nUsage: pi-vibehack [install|update|uninstall|--version]`); process.exit(2); }
-} catch (e) {
-  console.error(`✗ ${e.message}`);
-  process.exit(1);
+
+  const cmd = args._[0] ?? "install";
+
+  try {
+    if (cmd === "install") await cmdInstall(args);
+    else if (cmd === "update") await cmdUpdate(args);
+    else if (cmd === "uninstall") await cmdUninstall(args);
+    else {
+      console.error(
+        `unknown command: ${cmd}\n` +
+        "Usage: pi-vibehack [install|update|uninstall|--version]",
+      );
+      process.exit(2);
+    }
+  } catch (e) {
+    console.error(`✗ ${e.message}`);
+    process.exit(1);
+  }
 }
