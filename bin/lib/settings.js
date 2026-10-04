@@ -43,6 +43,15 @@ export async function addPackage(path, pkgSpec) {
   await writeSettings(path, s);
 }
 
+export async function addPromptPath(path, promptPath) {
+  const s = await readSettings(path);
+  s.prompts = Array.isArray(s.prompts) ? s.prompts : [];
+  if (!s.prompts.includes(promptPath)) {
+    s.prompts.push(promptPath);
+  }
+  await writeSettings(path, s);
+}
+
 export async function removePackage(path, matcher) {
   const s = await readSettings(path);
   if (!Array.isArray(s.packages)) return;

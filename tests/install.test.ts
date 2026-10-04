@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { addPackage, removePackage, readSettings } from "../bin/lib/settings.js";
+import { addPackage, addPromptPath, removePackage, readSettings } from "../bin/lib/settings.js";
 import { ensureDataDir, vibehackDir, writeProfile, readProfile } from "../bin/lib/data-dir.js";
 
 let tmp: string;
@@ -37,6 +37,21 @@ describe("settings.json patcher", () => {
     expect(s.theme).toBe("dark");
     expect(s.apiKeys.anthropic).toBe("sk-x");
     expect(s.packages).toContain("npm:@m4xx101/pi-vibehack@1.0.0");
+  });
+
+  it("adds a prompt path idempotently while preserving existing settings", async () => {
+    const path = join(tmp, "settings.json");
+    await fs.writeFile(
+      path,
+      JSON.stringify({ theme: "dark", prompts: ["/existing/prompts"] }, null, 2),
+    );
+
+    await addPromptPath(path, "/runtime/prompts");
+    await addPromptPath(path, "/runtime/prompts");
+
+    const s = await readSettings(path);
+    expect(s.theme).toBe("dark");
+    expect(s.prompts).toEqual(["/existing/prompts", "/runtime/prompts"]);
   });
 
   it("removePackage removes the matching entry", async () => {
