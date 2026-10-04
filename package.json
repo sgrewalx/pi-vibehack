@@ -65,7 +65,7 @@
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*",
-    "pi-prompt-template-model": "^0.9.0",
+    "pi-prompt-template-model": "^0.12.3",
     "@sinclair/typebox": "*"
   },
   "peerDependenciesMeta": {

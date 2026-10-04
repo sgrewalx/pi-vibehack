@@ -162,7 +162,7 @@ async function cmdInstall(args) {
   }
 
   await addPackage(settingsPath, `npm:${PKG.name}@${PKG.version}`);
-  await addPackage(settingsPath, "npm:pi-prompt-template-model@^0.9.0");
+  await addPackage(settingsPath, "npm:pi-prompt-template-model@^0.12.3");
 
   // @zenobius/pi-dcp's transitive @stacksjs/clarity has a broken postinstall
   // (`bunx git-hooks` ENOENT). pi-mono lazy-installs settings packages at boot
