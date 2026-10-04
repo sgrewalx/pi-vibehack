@@ -17,13 +17,61 @@ import {
 import { wrapToolResult } from "./lib/tool-result.ts";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+function extractVibehackTarget(args: string): string {
+  const tokens =
+    String(args ?? "")
+      .match(/"[^"]*"|'[^']*'|\S+/g)
+      ?.map((token) =>
+        (token.startsWith('"') && token.endsWith('"')) ||
+        (token.startsWith("'") && token.endsWith("'"))
+          ? token.slice(1, -1)
+          : token,
+      ) ?? [];
+
+  // Runtime prompt-template flags whose values must not become the target.
+  const valueFlags = new Set(["--model", "--thinking", "--cwd", "--loop"]);
+
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+
+    if (token.startsWith("--")) {
+      if (!token.includes("=") && valueFlags.has(token) && i + 1 < tokens.length) {
+        i++;
+      }
+      continue;
+    }
+
+    return token;
+  }
+
+  return "";
+}
 
 export default function vibehack(pi: any) {
   // Make package-relative scripts available to prompts regardless of whether
   // vibehack was loaded from a local path or an npm installation.
   process.env.VIBEHACK_PACKAGE_ROOT = PACKAGE_ROOT;
+
+  const pendingPromptInvocations = new Map<string, { ctx: any }>();
+  pi.events.on?.("prompt-template:prompt:invoke:ack", (payload: any) => {
+    const requestId = payload?.requestId;
+    if (typeof requestId !== "string") return;
+
+    const pending = pendingPromptInvocations.get(requestId);
+    if (!pending) return;
+    pendingPromptInvocations.delete(requestId);
+
+    if (!payload.accepted) {
+      pending.ctx.ui?.notify?.(
+        `engagement started, but planner prompt was not invoked: ${payload.reason ?? "unknown reason"}`,
+        "warn",
+      );
+    }
+  });
   // v1.4.3: every Tool's execute() must return pi-mono's documented shape
   // ({content:[{type:"text",text:string}], details?:any}). Pre-1.4.3 tools
   // returned plain objects which crashed pi-mono's render-utils.js:30 on
@@ -106,42 +154,54 @@ export default function vibehack(pi: any) {
 
   // Custom commands
 
-  // /vibehack <target> — bootstrap engagement BEFORE the prompt body renders.
-  // The .md prompt has `restore: true` so the LLM still gets the planner instructions;
-  // this handler ensures the engagement exists by the time the LLM calls vibehack_expand.
-  // Without this, the LLM saw "no active engagement" in the session banner and refused
-  // to call the tool at all.
+  // /vibehack <target> — bootstrap the engagement, then invoke the internal
+  // vibehack-start prompt through pi-prompt-template-model. Keeping the prompt
+  // under a distinct internal name avoids a slash-command collision with this
+  // extension-owned /vibehack command.
   pi.registerCommand("vibehack", {
     description: "Start a new vibehack engagement against the given target",
     handler: async (args: string, ctx: any) => {
-      const target = String(args ?? "").trim();
-      if (!target) { ctx.ui.notify("usage: /vibehack <target>", "warn"); return; }
+      const rawArgs = String(args ?? "").trim();
+      const target = extractVibehackTarget(rawArgs);
+      if (!target) {
+        ctx.ui.notify("usage: /vibehack [--model=<model>] <target>", "warn");
+        return;
+      }
+
       const { activeEngagementId, setActiveEngagement, engagementDir, newEngagementId, slugify } =
         await import("./lib/engagement.ts");
       const { appendEvent, nowIso } = await import("./lib/events.ts");
       const { promises: fs } = await import("node:fs");
 
       const existing = await activeEngagementId();
-      // If an engagement is already active for the same target, reuse it.
+
       if (existing && existing.endsWith(`-${slugify(target)}`)) {
         ctx.ui.notify(`engagement already active: ${existing}`, "info");
-        return;
+      } else {
+        const engId = newEngagementId(target);
+        const dir = engagementDir(engId);
+        await fs.mkdir(dir, { recursive: true });
+        await setActiveEngagement(engId);
+        await appendEvent(dir, {
+          ts: nowIso(),
+          engagement_id: engId,
+          event: "engagement_start",
+          metadata: { target },
+        } as any);
+
+        try { (pi as any).setSessionName?.(`vibehack: ${target}`); } catch {}
+        ctx.ui.notify(`engagement started: ${engId} (target: ${target})`, "info");
       }
 
-      const engId = newEngagementId(target);
-      const dir = engagementDir(engId);
-      await fs.mkdir(dir, { recursive: true });
-      await setActiveEngagement(engId);
-      await appendEvent(dir, {
-        ts: nowIso(),
-        engagement_id: engId,
-        event: "engagement_start",
-        metadata: { target },
-      } as any);
-      // v1.2 Phase 7: name the pi session so /resume shows "vibehack: <target>"
-      // instead of cwd-encoded gibberish. Optional API on older pi-mono builds.
-      try { (pi as any).setSessionName?.(`vibehack: ${target}`); } catch {}
-      ctx.ui.notify(`engagement started: ${engId} (target: ${target})`, "info");
+      const requestId = randomUUID();
+      pendingPromptInvocations.set(requestId, { ctx });
+
+      pi.events.emit("prompt-template:prompt:invoke", {
+        protocolVersion: 1,
+        requestId,
+        name: "vibehack-start",
+        args: rawArgs,
+      });
     },
   });
 

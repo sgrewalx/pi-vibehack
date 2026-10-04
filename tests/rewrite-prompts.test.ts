@@ -33,7 +33,7 @@ describe("rewritePromptsForProfile", () => {
   it("rewrites planner / operator / reporter model lines", async () => {
     const { rewritePromptsForProfile } = await import("../bin/lib/rewrite-prompts.js");
     await rewritePromptsForProfile({ planner: "test-planner", operator: "test-operator", reporter: "test-reporter" });
-    expect(await fs.readFile(join(PROMPTS, "vibehack.md"), "utf8")).toMatch(/^model: test-planner/m);
+    expect(await fs.readFile(join(PROMPTS, "vibehack-start.md"), "utf8")).toMatch(/^model: test-planner/m);
     expect(await fs.readFile(join(PROMPTS, "confirm.md"), "utf8")).toMatch(/^model: test-operator/m);
     expect(await fs.readFile(join(PROMPTS, "vibehack-complete.md"), "utf8")).toMatch(/^model: test-reporter/m);
   });
@@ -60,7 +60,7 @@ describe("rewritePromptsForProfile", () => {
       const { rewritePromptsForProfile } = await import("../bin/lib/rewrite-prompts.js");
       await rewritePromptsForProfile("hybrid", { configPath: cfgPath, promptsDir: PROMPTS });
 
-      const planner = await fs.readFile(join(PROMPTS, "vibehack.md"), "utf8");
+      const planner = await fs.readFile(join(PROMPTS, "vibehack-start.md"), "utf8");
       expect(planner).toMatch(/model:\s*custom-planner-model/);
     } finally {
       await fs.rm(TMP, { recursive: true, force: true });

@@ -8,7 +8,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROMPTS_DIR = join(HERE, "..", "..", "prompts");
 
 const ROLE_PROMPTS = {
-  planner: ["vibehack.md", "vibehack-pause.md", "vibehack-resume.md", "expand.md", "prune.md", "steer.md", "vibehack-distill.md", "vibehack-pin.md", "vibehack-handoff.md", "vibehack-chain-reject.md"],
+  planner: ["vibehack-start.md", "vibehack-pause.md", "vibehack-resume.md", "expand.md", "prune.md", "steer.md", "vibehack-distill.md", "vibehack-pin.md", "vibehack-handoff.md", "vibehack-chain-reject.md"],
   operator: ["confirm.md", "vibehack-chain-confirm.md", "vibehack-ingest.md"],
   reporter: ["vibehack-complete.md"],
 };
