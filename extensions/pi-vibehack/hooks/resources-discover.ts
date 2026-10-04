@@ -1,21 +1,19 @@
 // resources_discover hook — surfaces EXTRA, per-session resources to pi-mono.
 //
-// IMPORTANT: bundled prompts/ and skills/ are declared in package.json#pi
-// (extensions/skills/prompts arrays). pi-mono's resource loader picks those
-// up from the package manifest at extension scan time. Returning the SAME
-// paths from this hook causes "[Prompt conflicts] ... (skipped)" warnings on
-// every boot — pi sees the same prompt registered twice and dedupes noisily.
+// Package prompts/ are source templates only. Config-driven runtime prompts
+// live under ~/.pi/agent/vibehack/prompts/ and are registered once through
+// settings.json.
 //
-// So this hook returns ONLY paths that aren't in the package manifest:
-//   • per-engagement specialist prompts (engagements/<id>/prompts/) if present
-//   • user-pinned global prompts (~/.pi/agent/vibehack/prompts/) if present
+// This hook therefore returns only dynamic resources that cannot be declared
+// statically:
+//   • per-engagement prompts/ and skills/
+//   • global learned/user skills
 //
-// Empty arrays are fine — pi-mono treats {skillPaths:[], promptPaths:[]} as a
-// no-op rather than a complaint.
+// It deliberately does NOT return the global runtime prompts directory,
+// because doing so would register those prompts twice.
 
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
-import { homedir } from "node:os";
 import type { ExtensionAPI } from "../lib/typed-pi.ts";
 import { activeEngagementId, engagementDir, vibehackRoot } from "../lib/engagement.ts";
 
@@ -38,12 +36,10 @@ export async function computeResourcePaths(): Promise<{ skillPaths: string[]; pr
     }
   } catch {}
 
-  // Operator-pinned globals (live alongside vibehack data dir, NOT the package)
+  // Global learned/user skills. Runtime prompts are already registered
+  // through settings.json and must not be returned here a second time.
   try {
-    const root = vibehackRoot() || join(homedir(), ".pi", "agent", "vibehack");
-    const userPrompts = join(root, "prompts");
-    const userSkills = join(root, "skills");
-    if (await dirExists(userPrompts)) promptPaths.push(userPrompts);
+    const userSkills = join(vibehackRoot(), "skills");
     if (await dirExists(userSkills)) skillPaths.push(userSkills);
   } catch {}
 

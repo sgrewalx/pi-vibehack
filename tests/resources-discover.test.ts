@@ -58,10 +58,16 @@ describe("resources_discover handler", () => {
     expect(out.promptPaths.some((p: string) => p.endsWith("prompts") && p.includes(eng))).toBe(true);
   });
 
-  it("surfaces global <vibehack-root>/prompts when present", async () => {
+  it("does not re-register global runtime prompts from <vibehack-root>/prompts", async () => {
     await fs.mkdir(join(tmp, "prompts"), { recursive: true });
     const out = await computeResourcePaths();
-    expect(out.promptPaths.some((p: string) => p.startsWith(tmp) && p.endsWith("prompts"))).toBe(true);
+    expect(out.promptPaths.some((p: string) => p.startsWith(tmp) && p.endsWith("prompts"))).toBe(false);
+  });
+
+  it("still surfaces global <vibehack-root>/skills when present", async () => {
+    await fs.mkdir(join(tmp, "skills"), { recursive: true });
+    const out = await computeResourcePaths();
+    expect(out.skillPaths.some((p: string) => p.startsWith(tmp) && p.endsWith("skills"))).toBe(true);
   });
 
   it("registerResourcesDiscoverHook installs a resources_discover handler", async () => {
