@@ -16,7 +16,7 @@ Common problems and their fixes. Symptom → diagnosis → fix.
 
 **Fix:**
 ```bash
-pi-vibehack update    # pulls latest from npm and re-pins
+pi-vibehack update    # updates from the current install source
 # or, force a specific version:
 npm i -g @m4xx101/vibeshack@latest
 pi-vibehack install
@@ -53,7 +53,7 @@ pi-vibehack update
 
 **Fix:**
 ```bash
-npm install -g @mariozechner/pi-coding-agent
+npm install -g @earendil-works/pi-coding-agent
 which pi   # verify it's on PATH
 ```
 
@@ -392,7 +392,7 @@ Result: no operator action required. If preflight fails (offline / registry down
 If you hit the same `bunx git-hooks` error installing pi-mono manually:
 
 ```bash
-npm install -g @mariozechner/pi-coding-agent --ignore-scripts
+npm install -g @earendil-works/pi-coding-agent --ignore-scripts
 ```
 
 ## WSL: Windows `pi.exe` shadowing Linux `pi`
@@ -428,7 +428,7 @@ curl -fsSL https://raw.githubusercontent.com/m4xx101/pi-vibehack/main/install.sh
 pi-vibehack update
 ```
 
-Or from inside pi: `/vibehack-update`. Preserves config, hand-edits, engagement data — see [INSTALL.md § Updating](INSTALL.md#updating).
+Or from inside pi: `/vibehack-update`. Preserves `config.yaml` and engagement data, and regenerates private runtime prompts without modifying package source prompts — see [INSTALL.md § Updating](INSTALL.md#updating).
 
 If `pi-vibehack` isn't on PATH (e.g., you removed it manually), reinstall via the curl-pipe:
 

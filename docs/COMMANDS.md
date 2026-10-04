@@ -153,10 +153,10 @@ Reject the pending chain proposal. Reason is logged.
 ## 7. Self-update + config
 
 ### `/vibehack-update`
-Self-update from npm. Idempotent. Equivalent to `pi-vibehack update` from your shell. After update, `/reload` or restart pi.
+Update vibehack from its current source. A local Git checkout uses `git pull --ff-only`; an npm installation pulls the latest npm package. Existing `config.yaml` and engagement data are preserved. After update, `/reload` or restart pi.
 
 ### `/vibehack-config sync`
-Regenerate prompt frontmatter (model assignments, etc.) from `~/.pi/agent/vibehack/config.yaml`. **Never clobbers operator-edited frontmatter** — uses a checksum sentinel to detect hand edits.
+Regenerate the private runtime prompt set under `~/.pi/agent/vibehack/prompts/` from the package source prompts, then apply model assignments from `~/.pi/agent/vibehack/config.yaml`. Package source prompts are never modified.
 
 ### `/vibehack-config show`
 Print the resolved config (after migration / defaults).

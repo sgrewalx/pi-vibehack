@@ -11,7 +11,7 @@ Five minutes from zero to a first hypothesis-tree engagement.
 pi-vibehack is a pi extension. You need pi installed first.
 
 ```bash
-npm i -g @mariozechner/pi-coding-agent
+npm i -g @earendil-works/pi-coding-agent
 pi --version    # confirm
 ```
 

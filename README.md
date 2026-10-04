@@ -41,7 +41,7 @@ This installs pi-mono if missing, the vibehack package, and writes `~/.pi/agent/
 ### Or via npm
 
 ```bash
-npm i -g @mariozechner/pi-coding-agent @m4xx101/vibeshack
+npm i -g @earendil-works/pi-coding-agent @m4xx101/vibeshack
 pi-vibehack install
 ```
 
@@ -59,12 +59,17 @@ node bin/install.js install
 ### Update
 
 ```bash
-pi-vibehack update     # from your shell
+pi-vibehack update     # npm/global install
 # or, inside pi:
 /vibehack-update
 ```
 
-Preserves `~/.pi/agent/vibehack/config.yaml`, hand-edited prompts, and all engagement data.
+Update behavior follows the current installation source: a local Git checkout is
+updated with `git pull --ff-only`, while an npm-installed package pulls the
+latest version from npm. Existing `config.yaml` and engagement data are
+preserved.
+
+Preserves `~/.pi/agent/vibehack/config.yaml` and all engagement data; private runtime prompts are regenerated without modifying package source prompts.
 
 > Trouble installing? See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
@@ -156,8 +161,8 @@ The HackerOne-style markdown report is in the engagement directory; the structur
 | **Tools + skills** | |
 | `/vibehack-ingest "<spec>"` | Tool synthesis — operator subprocess writes a new tool / recipe / specialist from a natural-language spec, validates, lands. |
 | `/vibehack-rescan-kali` | Refresh the Kali tool capability cache. |
-| `/vibehack-config sync` | Regenerate prompt frontmatter from live config without clobbering hand-edits. |
-| `/vibehack-update` | Self-update from npm; idempotent. |
+| `/vibehack-config sync` | Regenerate private runtime prompts from live config without modifying package source prompts. |
+| `/vibehack-update` | Update from the current install source (Git checkout or npm) while preserving config and engagement data. |
 | **Chains** | |
 | `/vibehack-chain-confirm [--interactive]` | Run the most recently proposed exploit chain. |
 | `/vibehack-chain-reject [reason]` | Reject the pending chain proposal. |
@@ -202,7 +207,7 @@ The planner has 15 always-active tools plus 30+ lazy wrappers it can load on dem
 | **HackerOne-style reports** | `vibehack_report_vuln` writes markdown + appends `vuln_reported` event; `ctx.ui.confirm` gates critical/high |
 | **`pi.appendEntry` mirror** | Every vibehack event lands in pi's session JSONL too; `/resume` shows the move history |
 | **Native AGENTS.md / SYSTEM.md** | Uses pi-mono's resource-loader (`resource-loader.js:31, 662, 666, 673, 677`); no duplicate stuffing |
-| **Type-safety** | Every hook fully typed against `@mariozechner/pi-coding-agent` exports; no `(event:any, ctx:any)` |
+| **Type-safety** | Every hook fully typed against `@earendil-works/pi-coding-agent` exports; no `(event:any, ctx:any)` |
 | **`prepareArguments` shims** | Every tool tolerates LLM field-name drift (`nodeId`→`node_id`, `vulnClass`→`kind`, etc.) before TypeBox validation |
 
 See [CHANGELOG.md](CHANGELOG.md) for the full v1.0 → v1.4 evolution and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the deep dive.

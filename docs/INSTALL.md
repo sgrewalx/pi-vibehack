@@ -9,10 +9,10 @@ Comprehensive install reference for pi-vibehack **v1.4**.
 ## Prerequisites
 
 - **Node.js ≥ 18** (`node --version`).
-- **pi-mono** (`@mariozechner/pi-coding-agent`). The installer aborts with a hint if `pi` is not on PATH:
+- **pi-mono** (`@earendil-works/pi-coding-agent`). The installer aborts with a hint if `pi` is not on PATH:
 
   ```bash
-  npm i -g @mariozechner/pi-coding-agent
+  npm i -g @earendil-works/pi-coding-agent
   pi --version
   ```
 
@@ -223,7 +223,13 @@ For sensitive engagements where data must not egress, **`--profile local` is the
 pi-vibehack update
 ```
 
-One command. Pulls the latest `@m4xx101/vibeshack` from the `latest` dist-tag and re-runs `pi-vibehack install` (idempotent). Re-execs the freshly-installed binary so the new version's install logic runs.
+One command. Update behavior follows the current installation source:
+
+- **Local Git checkout:** runs `git pull --ff-only` in the current checkout.
+- **npm installation:** installs the latest `@m4xx101/vibeshack` package from npm.
+- **Local non-Git source:** stops and asks you to update the source manually.
+
+After the source is updated, vibehack refreshes its runtime installation while preserving the existing `config.yaml` and engagement data. Runtime prompts are regenerated from `config.yaml`; package source prompts are not modified.
 
 ### From inside pi
 
