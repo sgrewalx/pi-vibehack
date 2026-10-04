@@ -1,8 +1,8 @@
-// Phase 6 of v1.2 — browser-verify behaviour when no Chrome is attached.
+// browser-verify behaviour for an explicitly supplied CDP endpoint.
 //
-// We don't bring up a real Chrome in tests; instead we assert the tool returns
-// a friendly { error: 'no-chrome-attached' } shape (instead of throwing) when
-// /json/list fails. End-to-end CDP smoke testing happens in docs/RECIPES.md.
+// We don't bring up a real Chrome here; instead we assert that an explicit
+// unavailable port returns { error: 'no-chrome-attached' } rather than falling
+// back to the managed-browser launcher.
 
 import { describe, it, expect } from "vitest";
 import { browserVerifyTool } from "../extensions/pi-vibehack/tools/browser-verify.ts";

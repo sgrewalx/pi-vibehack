@@ -4,8 +4,7 @@
 // - No external deps. Uses node:http for /json discovery and a tiny WS client
 //   built on node:net (RFC 6455 frames, client-mask).
 // - Single-target, single-session. Open → command → close.
-// - Operator runs `chrome --remote-debugging-port=9222` themselves; we never
-//   spawn the browser.
+// - Browser lifecycle is handled separately; this module only speaks CDP.
 //
 // What this is NOT: a full CDP library. It implements only the methods needed
 // by browser-verify: Page.navigate, Page.loadEventFired (event), Runtime.evaluate,

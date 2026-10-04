@@ -1,15 +1,19 @@
-// vibehack_browser_verify (Phase 6 of v1.2) — operator-attached Chrome verifier.
+// vibehack_browser_verify — raw-CDP browser verifier.
 //
-// Usage model: operator runs `chrome --remote-debugging-port=9222` (or similar
-// Chromium with --remote-debugging-port). This tool discovers a target via
-// /json/list, opens a CDP session, navigates to the URL, optionally evaluates
-// an expectation expression, and returns the result + a base64 screenshot.
+// With no host/port override, vibehack reuses or launches a dedicated headless
+// Chromium instance. Explicit host/port arguments preserve the original
+// operator-managed CDP behavior.
 //
 // Why not Patchright? Per v1.2 plan: keep the dependency footprint tiny. The
 // minimal CDP client lives in lib/cdp-client.ts (~200 LoC, no deps).
 
 import { Type } from "@sinclair/typebox";
 import { listTargets, CdpSession } from "../lib/cdp-client.ts";
+import {
+  ensureManagedBrowser,
+  MANAGED_CDP_HOST,
+  MANAGED_CDP_PORT,
+} from "../lib/managed-browser.ts";
 import { normalizeArgs, safePrepare } from "../lib/prepare-args.ts";
 
 export const browserVerifySchema = Type.Object({
@@ -22,11 +26,11 @@ export const browserVerifySchema = Type.Object({
 
 export const browserVerifyTool = {
   name: "vibehack_browser_verify",
-  label: "Verify finding in attached Chrome",
+  label: "Verify finding in browser",
   description:
-    "Navigate the operator's Chrome (--remote-debugging-port=9222) to <url>, " +
-    "optionally evaluate <expectation> as JS, return its value + a screenshot. " +
-    "Returns a friendly error when no Chrome is attached.",
+    "Navigate a managed headless Chromium browser to <url>, optionally evaluate " +
+    "<expectation> as JS, and return its value + a screenshot. Supplying host or " +
+    "port uses that explicit CDP endpoint instead of launching a managed browser.",
   parameters: browserVerifySchema,
 
   prepareArguments: safePrepare((args: unknown) =>
@@ -47,17 +51,38 @@ export const browserVerifyTool = {
     _onUpdate?: any,
     _ctx?: any,
   ): Promise<any> {
-    const host = params.host ?? "127.0.0.1";
-    const port = params.port ?? 9222;
     const timeoutMs = params.timeout_ms ?? 15_000;
+    const explicitEndpoint =
+      params.host !== undefined || params.port !== undefined;
+
+    const host = params.host ??
+      (explicitEndpoint ? "127.0.0.1" : MANAGED_CDP_HOST);
+    const port = params.port ??
+      (explicitEndpoint ? 9222 : MANAGED_CDP_PORT);
 
     let targets;
     try {
-      targets = await listTargets(host, port);
+      if (explicitEndpoint) {
+        targets = await listTargets(host, port);
+      } else {
+        const managed = await ensureManagedBrowser({
+          host,
+          port,
+          timeoutMs: Math.min(timeoutMs, 10_000),
+        });
+        targets = managed.targets;
+      }
     } catch (e: any) {
+      if (explicitEndpoint) {
+        return {
+          error: "no-chrome-attached",
+          hint: `start Chrome with --remote-debugging-port=${port} (got: ${e?.message ?? String(e)})`,
+        };
+      }
+
       return {
-        error: "no-chrome-attached",
-        hint: `start Chrome with --remote-debugging-port=${port} (got: ${e?.message ?? String(e)})`,
+        error: "managed-browser-unavailable",
+        hint: String(e?.message ?? e),
       };
     }
     const page = targets.find((t) => t.type === "page" && t.webSocketDebuggerUrl);
