@@ -43,6 +43,7 @@ export async function listTargets(host = "127.0.0.1", port = 9222): Promise<CdpT
 interface PendingRpc {
   resolve: (v: any) => void;
   reject: (e: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
 }
 
 export class CdpSession {
@@ -134,7 +135,7 @@ export class CdpSession {
         payload = out;
       }
       this.buf = this.buf.slice(offset + len);
-      if (!fin) continue; // (we don't need fragmented support for CDP)
+      if (!fin) continue;
       if (opcode === 0x1) {
         try { this.dispatch(JSON.parse(payload.toString("utf8"))); } catch {}
       } else if (opcode === 0x8) {
@@ -149,6 +150,7 @@ export class CdpSession {
       const p = this.pending.get(msg.id);
       if (!p) return;
       this.pending.delete(msg.id);
+      clearTimeout(p.timer);
       if (msg.error) p.reject(new Error(msg.error.message ?? String(msg.error)));
       else p.resolve(msg.result);
     } else if (msg.method) {
@@ -171,12 +173,18 @@ export class CdpSession {
     };
   }
 
-  send(method: string, params: any = {}): Promise<any> {
+  send(method: string, params: any = {}, timeoutMs = 10_000): Promise<any> {
     if (!this.socket) return Promise.reject(new Error("CDP not connected"));
     const id = this.nextId++;
     const payload = JSON.stringify({ id, method, params });
+
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`CDP command timed out: ${method} (${timeoutMs}ms)`));
+      }, timeoutMs);
+
+      this.pending.set(id, { resolve, reject, timer });
       this.writeText(payload);
     });
   }
@@ -205,6 +213,13 @@ export class CdpSession {
 
   close(): void {
     try { this.socket?.end(); } catch {}
+
+    for (const [id, pending] of this.pending) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error("CDP session closed"));
+      this.pending.delete(id);
+    }
+
     this.socket = null;
     this.opened = false;
   }

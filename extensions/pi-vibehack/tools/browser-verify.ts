@@ -68,14 +68,14 @@ export const browserVerifyTool = {
     const session = new CdpSession(page.webSocketDebuggerUrl);
     try {
       await session.open(timeoutMs);
-      await session.send("Page.enable");
-      await session.send("Runtime.enable");
+      await session.send("Page.enable", {}, timeoutMs);
+      await session.send("Runtime.enable", {}, timeoutMs);
 
       const loaded = new Promise<void>((resolve) => {
         const off = session.on("Page.loadEventFired", () => { off(); resolve(); });
         setTimeout(() => { off(); resolve(); }, timeoutMs);
       });
-      await session.send("Page.navigate", { url: params.url });
+      await session.send("Page.navigate", { url: params.url }, timeoutMs);
       await loaded;
 
       let evalResult: any = undefined;
@@ -86,7 +86,7 @@ export const browserVerifyTool = {
             returnByValue: true,
             awaitPromise: true,
             timeout: Math.min(timeoutMs, 10_000),
-          });
+          }, timeoutMs);
           evalResult = r.exceptionDetails
             ? { error: r.exceptionDetails.text ?? "exception", details: r.exceptionDetails }
             : { value: r.result?.value };
@@ -97,7 +97,11 @@ export const browserVerifyTool = {
 
       let screenshot: string | undefined;
       try {
-        const r = await session.send("Page.captureScreenshot", { format: "png" });
+        const r = await session.send(
+          "Page.captureScreenshot",
+          { format: "png" },
+          timeoutMs,
+        );
         screenshot = r.data; // base64 PNG
       } catch {
         screenshot = undefined;
