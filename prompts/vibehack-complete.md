@@ -14,7 +14,7 @@ Before returning, run Layer B reflection so confirmed leaves are distilled into
 refined recipes under `~/.pi/agent/vibehack/skills/learned/`:
 
 ```bash
-node "$(npm root -g)/@m4xx101/vibeshack/bin/vibehack-reflect.js"
+node "$VIBEHACK_PACKAGE_ROOT/bin/vibehack-reflect.js"
 ```
 
 This is best-effort — if it fails (e.g. no active engagement marker), continue
@@ -25,7 +25,7 @@ Then sweep any HTTP-callback canary listeners planted during the engagement
 listeners are stopped. Best-effort — never block report generation:
 
 ```bash
-node --input-type=module -e "import('@m4xx101/vibeshack/extensions/pi-vibehack/lib/canary.ts').then(m => m._cleanupAllListeners()).catch(() => {})"
+node --input-type=module -e "import('node:url').then(({pathToFileURL}) => import(pathToFileURL(process.env.VIBEHACK_PACKAGE_ROOT + '/extensions/pi-vibehack/lib/canary.ts').href)).then(m => m._cleanupAllListeners()).catch(() => {})"
 ```
 
 Return JSON: {"report_path": "report.md", "finding_count": N, "total_cost_usd": X}

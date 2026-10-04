@@ -10,7 +10,7 @@ Execute the absolute-path script that ships with the package (resolves
 extensions/ relative to itself, so it works from any CWD):
 
 ```bash
-node "$(npm root -g)/@m4xx101/vibeshack/bin/vibehack-reflect.js"
+node "$VIBEHACK_PACKAGE_ROOT/bin/vibehack-reflect.js"
 ```
 
 The script:

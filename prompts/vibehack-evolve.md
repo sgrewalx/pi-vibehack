@@ -12,7 +12,7 @@ Parse args:
 Execute the bench by invoking the runner script (resolves absolute paths via `import.meta.url`):
 
 ```bash
-node "$(npm root -g)/@m4xx101/vibeshack/bin/vibehack-evolve.js" $ARGUMENTS
+node "$VIBEHACK_PACKAGE_ROOT/bin/vibehack-evolve.js" $ARGUMENTS
 ```
 
 Report pass/fail and any missing findings.

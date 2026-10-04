@@ -15,8 +15,15 @@ import {
   browserVerifyTool, usePersonaTool, reportVulnTool, toolSearchTool,
 } from "./tools/index.ts";
 import { wrapToolResult } from "./lib/tool-result.ts";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 export default function vibehack(pi: any) {
+  // Make package-relative scripts available to prompts regardless of whether
+  // vibehack was loaded from a local path or an npm installation.
+  process.env.VIBEHACK_PACKAGE_ROOT = PACKAGE_ROOT;
   // v1.4.3: every Tool's execute() must return pi-mono's documented shape
   // ({content:[{type:"text",text:string}], details?:any}). Pre-1.4.3 tools
   // returned plain objects which crashed pi-mono's render-utils.js:30 on

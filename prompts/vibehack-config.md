@@ -14,7 +14,7 @@ If the subcommand is `sync`, execute the absolute-path sync script that ships
 with the package (resolves prompts/ relative to itself, so it works from any CWD):
 
 ```bash
-node "$(npm root -g)/@m4xx101/vibeshack/bin/vibehack-config-sync.js"
+node "$VIBEHACK_PACKAGE_ROOT/bin/vibehack-config-sync.js"
 ```
 
 If `show`, print the config.yaml contents. If `validate`, report version + which top-level sections are present.

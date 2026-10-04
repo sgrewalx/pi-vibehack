@@ -8,7 +8,7 @@ You are the Kali capability scanner. Run a fresh PATH probe for all curated Kali
 Execute:
 
 ```bash
-node "$(npm root -g)/@m4xx101/vibeshack/bin/vibehack-rescan-kali.js"
+node "$VIBEHACK_PACKAGE_ROOT/bin/vibehack-rescan-kali.js"
 ```
 
 Report the available count and the cache path.
