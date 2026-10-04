@@ -65,7 +65,8 @@
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*",
-    "pi-prompt-template-model": "^0.9.0"
+    "pi-prompt-template-model": "^0.9.0",
+    "@sinclair/typebox": "*"
   },
   "peerDependenciesMeta": {
     "@zenobius/pi-dcp": {
@@ -79,10 +80,10 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.4.0",
-    "vitest": "^1.6.0"
+    "vitest": "^1.6.0",
+    "@sinclair/typebox": "^0.32.0"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.32.0",
     "yaml": "^2.8.4"
   }
 }
