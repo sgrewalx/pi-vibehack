@@ -45,6 +45,55 @@ describe("vibehack_expand", () => {
     expect(events[0].kind).toBe("root");
   });
 
+  it("allocates unique sibling ids when expands run concurrently", async () => {
+    await expandTool.execute("root", {
+      parent_id: null,
+      kind: "root",
+      phase: "recon",
+      claim: "engagement root",
+      next_test: "",
+      falsifier: "n/a",
+      rationale: "starting engagement",
+    } as any, undefined, undefined, fakeCtx);
+
+    const claims = ["web", "subdomains", "API", "email", "third-party"];
+
+    const results = await Promise.all(
+      claims.map((claim, i) =>
+        expandTool.execute(`surface-${i}`, {
+          parent_id: "n_root",
+          kind: "surface",
+          phase: "recon",
+          claim,
+          next_test: `test ${claim}`,
+          falsifier: `no ${claim}`,
+          rationale: claim,
+        } as any, undefined, undefined, fakeCtx),
+      ),
+    );
+
+    expect(results.map((r: any) => r.details.node_id)).toEqual([
+      "n_1a",
+      "n_2b",
+      "n_3c",
+      "n_4d",
+      "n_5e",
+    ]);
+
+    const events = await readEvents(engagementDir("e1"));
+    const surfaces = events.filter(
+      (e: any) => e.event === "node_add" && e.parent_id === "n_root",
+    );
+
+    expect(surfaces.map((e: any) => e.node_id)).toEqual([
+      "n_1a",
+      "n_2b",
+      "n_3c",
+      "n_4d",
+      "n_5e",
+    ]);
+  });
+
   it("rejects expand without falsifier when not root", async () => {
     await expect(expandTool.execute("c", {
       parent_id: "n_root",

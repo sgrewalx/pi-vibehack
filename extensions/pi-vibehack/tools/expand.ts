@@ -4,6 +4,20 @@ import { activeEngagementId, engagementDir, newEngagementId, setActiveEngagement
 import { appendEvent, nowIso, readEvents, newNodeId } from "../lib/events.ts";
 import { normalizeArgs, safePrepare } from "../lib/prepare-args.ts";
 
+// Pi may execute multiple tool calls from one model turn concurrently.
+// Node-id allocation is a read/count/append critical section, so serialize
+// expand mutations to keep sibling IDs deterministic and unique.
+let expandQueue: Promise<void> = Promise.resolve();
+
+function serializeExpand<T>(fn: () => Promise<T>): Promise<T> {
+  const run = expandQueue.then(fn, fn);
+  expandQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 export const expandSchema = Type.Object({
   parent_id: Type.Union([Type.String(), Type.Null()]),
   kind: Type.Union([Type.Literal("root"), Type.Literal("surface"), Type.Literal("hypothesis"), Type.Literal("leaf")]),
@@ -34,6 +48,7 @@ export const expandTool = {
   ) as any,
 
   async execute(_callId: string, params: any, _signal?: any, _onUpdate?: any, ctx?: any) {
+    return await serializeExpand(async () => {
     if (params.kind !== "root" && (!params.falsifier || String(params.falsifier ?? "").trim().length === 0)) {
       throw new Error("falsifier is required for non-root nodes");
     }
@@ -92,5 +107,6 @@ export const expandTool = {
       content: [{ type: "text", text: `expanded node ${node_id} (${params.kind}/${params.phase})` }],
       details: { node_id, kind: params.kind, phase: params.phase },
     };
+    });
   },
 };
